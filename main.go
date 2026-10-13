@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-const version = "0.4.0-alpha.1"
+var version = "dev"
 
 func usage() {
 	fmt.Fprintf(os.Stderr, `wsd-gateway %s — automatic IPv4 WS-Discovery metadata gateway

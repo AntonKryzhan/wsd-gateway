@@ -1,0 +1,113 @@
+name: Build release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Test and package
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout tagged sources
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.26'
+          cache: false
+
+      - name: Test and vet
+        run: |
+          go vet ./...
+          go test -race ./...
+
+      - name: Build and package four platforms
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+        run: |
+          set -euo pipefail
+          if [[ "${REF_TYPE}" == "tag" ]]; then
+            version="${RELEASE_TAG#v}"
+          else
+            version="dev"
+          fi
+          mkdir -p dist work
+
+          for os in freebsd linux; do
+            for arch in amd64 arm64; do
+              name="wsd-gateway_${RELEASE_TAG}_${os}_${arch}"
+              pkg="work/${name}"
+              mkdir -p "${pkg}/configs" "${pkg}/docs"
+
+              GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 \
+                go build -trimpath \
+                -ldflags="-s -w -X main.version=${version}" \
+                -o "${pkg}/wsd-gateway" .
+
+              cp README.md README_RU.md LICENSE SECURITY.md "${pkg}/"
+              cp configs/config.example.json "${pkg}/configs/"
+              cp docs/CONFIGURATION.md "${pkg}/docs/"
+
+              if [[ "$os" == "freebsd" ]]; then
+                mkdir -p "${pkg}/etc/rc.d" "${pkg}/etc/newsyslog.conf.d" "${pkg}/scripts"
+                cp etc/rc.d/wsd_gateway "${pkg}/etc/rc.d/"
+                cp etc/newsyslog.conf.d/wsd_gateway.conf "${pkg}/etc/newsyslog.conf.d/"
+                cp scripts/stage-freebsd.sh "${pkg}/scripts/"
+              fi
+
+              (cd work && zip -q -r "../dist/${name}.zip" "${name}")
+              echo "Packaged ${name}.zip"
+            done
+          done
+
+          (cd dist && sha256sum *.zip > SHA256SUMS && sha256sum --check SHA256SUMS)
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-packages
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    name: Publish GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download release packages
+        uses: actions/download-artifact@v8
+        with:
+          name: release-packages
+          path: dist/
+
+      - name: Verify checksums
+        run: cd dist && sha256sum --check SHA256SUMS
+
+      - name: Publish release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          options=(--verify-tag --generate-notes --title "WSD Gateway ${RELEASE_TAG}")
+          if [[ "${RELEASE_TAG}" == *-* ]]; then
+            options+=(--prerelease --latest=false)
+          fi
+          gh release create "${RELEASE_TAG}" dist/*.zip dist/SHA256SUMS "${options[@]}"
