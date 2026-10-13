@@ -1,3 +1,4 @@
+
 name: Build and test
 
 on:
@@ -5,30 +6,54 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   test:
+    name: Test and Vet
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
         with:
           go-version: '1.23'
-      - run: go vet ./...
-      - run: go test -race ./...
+          cache: false
+
+      - name: Go Vet
+        run: go vet ./...
+
+      - name: Run tests with race detector
+        run: go test -race ./...
+
   cross-build:
+    name: Cross-platform build
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
         with:
           go-version: '1.23'
+          cache: false
+
       - name: Cross-compile
         shell: bash
         run: |
           mkdir -p bin
           for os in freebsd linux; do
             for arch in amd64 arm64; do
-              GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 go build -trimpath \
-                -ldflags="-s -w" -o "bin/wsd-gateway-$os-$arch" .
+              echo "Building $os/$arch..."
+              GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 \
+                go build -trimpath \
+                -ldflags="-s -w" \
+                -o "bin/wsd-gateway-$os-$arch" .
             done
           done
