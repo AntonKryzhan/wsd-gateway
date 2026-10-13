@@ -1,3 +1,3 @@
-module github.com/example/wsd-gateway
+module github.com/AntonKryzhan/wsd-gateway
 
 go 1.22
