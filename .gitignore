@@ -1,0 +1,8 @@
+bin/
+*.log
+*.pid
+*.sock
+.config-local.json
+**/wsd-gateway-private.json
+.idea/
+.DS_Store

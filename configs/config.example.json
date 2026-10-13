@@ -1,0 +1,27 @@
+{
+  "sources": [
+    {
+      "name": "SOURCE_INTERFACE",
+      "allowed_cidrs": []
+    }
+  ],
+  "clients": [
+    {
+      "name": "CLIENT_INTERFACE",
+      "allowed_cidrs": []
+    }
+  ],
+  "http_port": 15357,
+  "admin_socket": "/var/run/wsd-gateway.sock",
+  "probe_interval": "60s",
+  "device_ttl": "15m",
+  "max_devices": 20000,
+  "max_responses_per_probe": 128,
+  "discovery_workers": 16,
+  "http_concurrency": 256,
+  "allowed_metadata_ports": [
+    5357
+  ],
+  "verify_metadata": true,
+  "static_devices": []
+}

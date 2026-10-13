@@ -1,0 +1,29 @@
+#!/bin/sh
+#
+# PROVIDE: wsd_gateway
+# REQUIRE: LOGIN NETWORKING
+# KEYWORD: shutdown
+#
+# Add wsd_gateway_enable="YES" to rc.conf after validating.
+
+. /etc/rc.subr
+
+name="wsd_gateway"
+rcvar="wsd_gateway_enable"
+load_rc_config "$name"
+
+: ${wsd_gateway_enable:="NO"}
+: ${wsd_gateway_config:="/usr/local/etc/wsd-gateway.json"}
+: ${wsd_gateway_log:="/var/log/wsd_gateway.log"}
+
+pidfile="/var/run/${name}.pid"
+command="/usr/sbin/daemon"
+command_args="-c -R 5 -P ${pidfile} -H -o ${wsd_gateway_log} /usr/local/sbin/wsd-gateway -config ${wsd_gateway_config} run"
+start_precmd="${name}_prestart"
+
+wsd_gateway_prestart()
+{
+    /usr/local/sbin/wsd-gateway -config "${wsd_gateway_config}" check >/dev/null || return 1
+}
+
+run_rc_command "$1"
